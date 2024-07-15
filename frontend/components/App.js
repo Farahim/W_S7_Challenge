@@ -17,7 +17,7 @@ function App() {
             <Route path='order' element={<Form />}/>
         </Routes>
     </div>
-  )
+  );
 }
 
 export default App

@@ -1,143 +1,135 @@
-import React, { useEffect, useState } from 'react'
-import * as yup from 'yup';
+import React, { useState, useEffect } from 'react';
 
-// 👇 Here are the validation errors you will use with Yup.
 const validationErrors = {
-  fullNameTooShort: 'full name must be at least 3 characters',
-  fullNameTooLong: 'full name must be at most 20 characters',
-  sizeIncorrect: 'size must be S or M or L'
-}
+    fullNameTooShort: 'full name must be at least 3 characters',
+    fullNameTooLong: 'full name must be at most 20 characters',
+    sizeIncorrect: 'size must be S or M or L'
+};
 
-// 👇 Here you will create your schema.
-const formSchema = yup.object().shape({
-    fullName: yup
-        .string()
-        .trim()
-        .min(3, validationErrors.fullNameTooShort)
-        .max(20, validationErrors.fullNameTooLong),
-    size: yup
-        .string()
-        .trim()
-        .oneOf(['S', 'M', 'L'], validationErrors.sizeIncorrect),
-});
-
-// 👇 This array could help you construct your checkboxes using .map in the JSX.
 const toppings = [
-  { topping_id: '1', text: 'Pepperoni' },
-  { topping_id: '2', text: 'Green Peppers' },
-  { topping_id: '3', text: 'Pineapple' },
-  { topping_id: '4', text: 'Mushrooms' },
-  { topping_id: '5', text: 'Ham' },
-]
+    { topping_id: '1', text: 'Pepperoni' },
+    { topping_id: '2', text: 'Green Peppers' },
+    { topping_id: '3', text: 'Pineapple' },
+    { topping_id: '4', text: 'Mushrooms' },
+    { topping_id: '5', text: 'Ham' },
+];
 
 export default function Form() {
-    const [formValues, setFormValues] = useState({
-        fullName: '',
-        size: '',
-        toppings: Object.fromEntries(toppings.map(topping => [topping.topping_id, false])),
-    });
-    const [formErrors, setFormErrors] = useState({});
-    const [formValid, setFormValid] = useState(false);
-    const [formSuccess, setFormSuccess] = useState('');
-    const [formFailure, setFormFailure] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [size, setSize] = useState('');
+    const [selectedToppings, setSelectedToppings] = useState([]);
+    const [errors, setErrors] = useState({});
+    const [successMessage, setSuccessMessage] = useState('');
 
-    useEffect(() => {
-        formSchema
-            .validate(formValues, { abortEarly: false })
-            .then(() => {
-                setFormValid(true);
-                setFormErrors({});
-            })
-            .catch(err => {
-                setFormValid(false);
-                const newErrors = {};
-                err.inner.forEach(error => {
-                    newErrors[error.path] = error.message;
+    const validateForm = () => {
+        const newErrors = {};
+        if (fullName.trim().length < 3) newErrors.fullName = validationErrors.fullNameTooShort;
+        if (!['S', 'M', 'L'].includes(size)) newErrors.size = validationErrors.sizeIncorrect;
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        if (validateForm()) {
+            try {
+                const response = await fetch('http://localhost:9009/api/order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fullName: fullName.trim(),
+                        size,
+                        toppings: selectedToppings,
+                    }),
                 });
-                setFormErrors(newErrors);
-            });
-    }, [formValues]);
 
-    const handleSubmit = (evt) => {
-        evt.preventDefault();
-        formSchema
-            .validate(formValues)
-            .then(() => {
-                setFormSuccess(true);
-                setFormFailure(false);
-                setFormValues({
-                    fullName: '',
-                    size: '',
-                    toppings: Object.fromEntries(toppings.map(topping => [topping.topping_id, false])),
-                })
-            })
-            .catch(() => {
-                setFormFailure(true);
-                setFormSuccess(false);
-            });
+                if (!response.ok) {
+                    throw new Error('Server responded with an error!');
+                }
+
+                const data = await response.json();
+                setSuccessMessage(data.message); // Assuming the server sends back a message
+            } catch (error) {
+                setErrors({ submit: error.message });
+            }
+
+            // Reset form
+            setFullName('');
+            setSize('');
+            setSelectedToppings([]);
+        }
     };
 
-    const handleChange = (toppingId) => {
-        setFormValues({
-            ...formValues,
-            toppings: { ...formValues.toppings, [toppingId]: !formValues.toppings[toppingId] },
-        });
+    const handleToppingChange = (event) => {
+        const toppingValue = event.target.name;
+        setSelectedToppings(prevToppings =>
+            prevToppings.includes(toppingValue)
+                ? prevToppings.filter(t => t !== toppingValue)
+                : [...prevToppings, toppingValue]
+        );
     };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <h2>Order Your Pizza</h2>
-      {true && <div className='success'>Thank you for your order!</div>}
-      {true && <div className='failure'>Something went wrong</div>}
+    // Call handleValidation when fullName or size changes
+    useEffect(() => {
+        const newErrors = {};
+        if (fullName.trim().length < 3) newErrors.fullName = validationErrors.fullNameTooShort;
+        if (!['S', 'M', 'L'].includes(size)) newErrors.size = validationErrors.sizeIncorrect;
+        setErrors(newErrors);
+    }, [fullName, size]);
 
-        <div className="input-group">
-            <div>
-                <label htmlFor="fullName">Full Name</label><br/>
-                <input
-                    placeholder="Type full name"
-                    id="fullName"
-                    type="text"
-                    value={formValues.fullName}
-                    onChange={(evt) => setFormValues({...formValues, fullName: evt.target.value})}
-                />
+    return (
+        <form onSubmit={handleSubmit}>
+            <h2>Order Your Pizza</h2>
+            {successMessage && <div className='success'>{successMessage}</div>}
+            {errors.submit && <div className='failure'>{errors.submit}</div>}
+
+            <div className="input-group">
+                <div>
+                    <label htmlFor="fullName">Full Name</label><br />
+                    <input
+                        value={fullName}
+                        onChange={e => setFullName(e.target.value)}
+                        placeholder="Type full name"
+                        id="fullName"
+                        type="text"
+                    />
+                </div>
+                {errors.fullName && <div className='error'>{errors.fullName}</div>}
             </div>
-            {formErrors.fullName && <div className='error'>{formErrors.fullName}</div>}
-        </div>
 
-        <div className="input-group">
-            <div>
-                <label htmlFor="size">Size</label><br/>
-                <select
-                    id="size"
-                    value={formValues.size}
-                    onChange={(evt) => setFormValues({...formValues, size: evt.target.value})}
-                >
-                    {/* Fill out the missing options */}
-                    <option value="">----Choose Size----</option>
-                <option value="S">Small</option>
-                <option value="M">Medium</option>
-                <option value="L">Large</option>
-            </select>
-        </div>
-        {formErrors.size && <div className='error'>{formErrors.size}</div>}
-    </div>
+            <div className="input-group">
+                <div>
+                    <label htmlFor="size">Size</label><br />
+                    <select
+                        value={size}
+                        onChange={e => setSize(e.target.value)}
+                        id="size"
+                    >
+                        <option value="">----Choose Size----</option>
+                        <option value="S">Small</option>
+                        <option value="M">Medium</option>
+                        <option value="L">Large</option>
+                    </select>
+                </div>
+                {errors.size && <div className='error'>{errors.size}</div>}
+            </div>
 
-    <div className="input-group">
-        {/* 👇 Maybe you could generate the checkboxes dynamically */}
-        {toppings.map(topping => (
-            <label key={topping.topping_id}>
-                <input
-                    name={topping.topping_id}
-                    type="checkbox"
-                    checked={formValues.toppings[topping.topping_id] || false}
-                    onChange={() => handleChange(topping.topping_id)}
-                />
-                {topping.text}<br />
-            </label>
-        ))}
-    </div>
-
-    <input disabled={!formValid} type="submit" />
-</form>
-  )
+            <div className="input-group">
+                {toppings.map(topping => (
+                    <label key={topping.topping_id}>
+                        <input
+                            name={topping.topping_id}
+                            type="checkbox"
+                            checked={selectedToppings.includes(topping.topping_id)}
+                            onChange={handleToppingChange}
+                        />
+                        {topping.text}<br />
+                    </label>
+                ))}
+            </div>
+            <input type="submit" disabled={Object.keys(errors).length > 0} />
+        </form>
+    );
 }
