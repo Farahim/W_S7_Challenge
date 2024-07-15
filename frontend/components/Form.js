@@ -33,7 +33,7 @@ export default function Form() {
         event.preventDefault();
         if (validateForm()) {
             try {
-                const response = await fetch('http://localhost:9009/api/order', {
+                const response = await fetch('http://localhost:3003/api/order', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
